@@ -1,0 +1,93 @@
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return isSignedIn() &&
+             currentUserDoc().data.active == true;
+    }
+
+    function userRole() {
+      return currentUserDoc().data.role;
+    }
+
+    function userRestaurantId() {
+      return currentUserDoc().data.restaurantId;
+    }
+
+    function resourceRestaurantMatches() {
+      return resource.data.restaurantId == userRestaurantId();
+    }
+
+    function requestRestaurantMatches() {
+      return request.resource.data.restaurantId == userRestaurantId();
+    }
+
+    function isAdmin() { return userRole() == 'admin'; }
+    function isWaiter() { return userRole() == 'waiter'; }
+    function isKitchen() { return userRole() == 'kitchen'; }
+    function isCashier() { return userRole() == 'cashier'; }
+
+    match /users/{userId} {
+      allow read: if isActiveUser() && (userId == request.auth.uid || isAdmin());
+      allow create: if isActiveUser() && isAdmin() && requestRestaurantMatches();
+      allow update: if isActiveUser() && isAdmin() && resourceRestaurantMatches();
+      allow delete: if false;
+    }
+
+    match /restaurants/{restaurantId} {
+      allow read: if isActiveUser() && restaurantId == userRestaurantId();
+      allow create: if isSignedIn();
+      allow update: if isActiveUser() && isAdmin() && restaurantId == userRestaurantId();
+      allow delete: if false;
+    }
+
+    match /tables/{tableId} {
+      allow read: if isActiveUser() && resourceRestaurantMatches();
+      allow create: if isActiveUser() && isAdmin() && requestRestaurantMatches();
+      allow update: if isActiveUser() && resourceRestaurantMatches() &&
+        (isAdmin() || isWaiter() || isCashier());
+      allow delete: if isActiveUser() && isAdmin() && resourceRestaurantMatches();
+    }
+
+    match /menu_items/{itemId} {
+      allow read: if isActiveUser() && resourceRestaurantMatches();
+      allow create, update, delete: if isActiveUser() && isAdmin() && requestRestaurantMatches();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isActiveUser() && resourceRestaurantMatches();
+      allow create: if isActiveUser() && requestRestaurantMatches() &&
+        (isAdmin() || isWaiter());
+      allow update: if isActiveUser() && resourceRestaurantMatches() &&
+        (isAdmin() || isWaiter() || isKitchen() || isCashier());
+      allow delete: if false;
+    }
+
+    match /order_items/{itemId} {
+      allow read: if isActiveUser() && resourceRestaurantMatches();
+      allow create: if isActiveUser() && requestRestaurantMatches() &&
+        (isAdmin() || isWaiter());
+      allow update: if isActiveUser() && resourceRestaurantMatches() &&
+        (isAdmin() || isKitchen() || isWaiter());
+      allow delete: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isActiveUser() && resourceRestaurantMatches();
+      allow create: if isActiveUser() && requestRestaurantMatches() &&
+        (isAdmin() || isCashier());
+      allow update, delete: if false;
+    }
+  }
+}
+```
