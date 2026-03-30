@@ -1,4 +1,4 @@
-```dart
+``dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_language.dart';
@@ -188,3 +188,4 @@ class _OrderScreenState extends State<OrderScreen> {
 }
 ```
 
+---
